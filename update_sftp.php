@@ -7,7 +7,8 @@
  * More: https://github.com/Davis-Desormeaux
  *
  */
- 
+
+$PROJECT_DIR = 'c:\\wamp\\www\\phpbox\\PHPidler';
 $LOCAL_TZONE = 'America/Montreal';
 $LAST_UPDATE = null;
 $HOST = 'host.com';
@@ -64,7 +65,7 @@ function getFiles($pattern = '*', $flags = 0, $path = false, $depth = 0, $level 
   array_walk($toUpdate, function($val,$key) use(&$toUpdate){
     global $LAST_UPDATE; 
     if (filemtime($val) - $LAST_UPDATE < 0) {
-        unset($toUpdate[$key]);
+      unset($toUpdate[$key]);
     }
   });
   
@@ -79,13 +80,12 @@ function getFiles($pattern = '*', $flags = 0, $path = false, $depth = 0, $level 
 * @param  string  $host
 * @param  bool    $silent Optional 
 */
-function sendToSFTP($locFile, $destFoder, $user, $pass, $host, $silent = false) {
-  global $user, $pass, $host;
+function sendToSFTP($locFile, $user, $pass, $host, $destFoder = '/', $silent = false) {
   $ch = curl_init();
   $fp = fopen($locFile, 'r');
   
   // curl_setopt($ch, CURLOPT_URL, 'sftp://'.$user.':'.$pass.'@'.$host.$locFile);
-  curl_setopt($ch, CURLOPT_URL, 'sftp://$host.$destFoder');
+  curl_setopt($ch, CURLOPT_URL, 'sftp://'.$host.$destFoder);
   curl_setopt($ch, CURLOPT_USERPWD, $user.':'.$pass);
   curl_setopt($ch, CURLOPT_UPLOAD, 1);
   curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_SFTP);
@@ -97,19 +97,29 @@ function sendToSFTP($locFile, $destFoder, $user, $pass, $host, $silent = false) 
   
   $msg = ($error_no == 0) ? 'OK: '.$locFile.' Sent ' : 'Error: ' . curl_error($ch);
   if (!silent) echo $msg . PHP_EOL;
-
 }
 
-// Get last updated stamp.
-initLastUpdate(); 
-// Get a the list of file that where modified since last update.
-$files = getFiles('*', 0, '/home/mazloq', -1);
-// Send the files to SFTP server/
-foreach ($files as $fileToUpdate) {
-  echo $fileToUpdate . PHP_EOL;
-  // TODO: extract path and test cURL.
-  // sendToSFTP($fileToUpdate, '/', $USER, $PASS, $HOST);
+function update() {
+  global $USER, $PASS, $HOST, $PROJECT_DIR;
+  // Get last updated stamp.
+  initLastUpdate(); 
+  // Get a the list of file that where modified since last update.
+  $files = getFiles('*', 0, $PROJECT_DIR, -1);
+  // Send the files to SFTP server
+  foreach ($files as $fileToUpdate) {
+    if (is_dir($fileToUpdate)) continue;
+    $remoteToFile = str_replace(DIRECTORY_SEPARATOR, '/', $fileToUpdate);  
+    $remoteToFile = substr($remoteToFile, strlen($PROJECT_DIR)+1);
+    $remoteFolder = '/';
+    
+    if ($dirPos = strrpos($remoteToFile, '/')) {
+      $remoteFolder = '/' . substr($remoteToFile, 0, $dirPos + 1);
+    }
+    sendToSFTP($fileToUpdate, $USER, $PASS, $HOST, $remoteFolder);
+  }
+  // Update the timestamp.
+  file_put_contents('./lastupdate', time(), LOCK_EX);
 }
- // Update the timestamp.
-file_put_contents('./lastupdate', time(), LOCK_EX);
+
+update();
 ?>
