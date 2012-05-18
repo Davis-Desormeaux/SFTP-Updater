@@ -8,7 +8,7 @@
  *
  */
 
-$PROJECT_DIR = 'c:\\wamp\\www\\phpbox\\PHPidler';
+$PROJECT_DIR = '/home/mazlok/workspace';
 $LOCAL_TZONE = 'America/Montreal';
 $LAST_UPDATE = null;
 $HOST = 'host.com';
@@ -44,7 +44,7 @@ function initLastUpdate(){
 * @param  string  path      directory to update
 * @param  int     depth     recursion depth -1 for unlimited, 0 for current directory
 *
-* @return array 
+* @return array
 */
 function getFiles($pattern = '*', $flags = 0, $path = false, $depth = 0, $level = 0) {
   $ftree = array();
@@ -54,21 +54,21 @@ function getFiles($pattern = '*', $flags = 0, $path = false, $depth = 0, $level 
   if (!empty($paths) && ($level < $depth || $depth == -1)) {
     $level++;
     foreach ($paths as $sub_path) {
-      $ftree = array_merge( 
+      $ftree = array_merge(
           $ftree,
           getFiles($pattern, $flags, $sub_path.DIRECTORY_SEPARATOR, $depth, $level)
       );
     }
   }
   $toUpdate = array_merge($ftree, $files);
-  
+
   array_walk($toUpdate, function($val,$key) use(&$toUpdate){
-    global $LAST_UPDATE; 
+    global $LAST_UPDATE;
     if (filemtime($val) - $LAST_UPDATE < 0) {
       unset($toUpdate[$key]);
     }
   });
-  
+
   return $toUpdate;
 }
 
@@ -78,12 +78,12 @@ function getFiles($pattern = '*', $flags = 0, $path = false, $depth = 0, $level 
 * @param  string  $user
 * @param  string  $pass
 * @param  string  $host
-* @param  bool    $silent Optional 
+* @param  bool    $silent Optional
 */
 function sendToSFTP($locFile, $user, $pass, $host, $destFoder = '/', $silent = false) {
   $ch = curl_init();
   $fp = fopen($locFile, 'r');
-  
+
   // curl_setopt($ch, CURLOPT_URL, 'sftp://'.$user.':'.$pass.'@'.$host.$locFile);
   curl_setopt($ch, CURLOPT_URL, 'sftp://'.$host.$destFoder);
   curl_setopt($ch, CURLOPT_USERPWD, $user.':'.$pass);
@@ -94,7 +94,7 @@ function sendToSFTP($locFile, $user, $pass, $host, $destFoder = '/', $silent = f
   curl_exec ($ch);
   $error_no = curl_errno($ch);
   curl_close ($ch);
-  
+
   $msg = ($error_no == 0) ? 'OK: '.$locFile.' Sent ' : 'Error: ' . curl_error($ch);
   if (!silent) echo $msg . PHP_EOL;
 }
@@ -102,16 +102,16 @@ function sendToSFTP($locFile, $user, $pass, $host, $destFoder = '/', $silent = f
 function update() {
   global $USER, $PASS, $HOST, $PROJECT_DIR;
   // Get last updated stamp.
-  initLastUpdate(); 
+  initLastUpdate();
   // Get a the list of file that where modified since last update.
   $files = getFiles('*', 0, $PROJECT_DIR, -1);
   // Send the files to SFTP server
   foreach ($files as $fileToUpdate) {
     if (is_dir($fileToUpdate)) continue;
-    $remoteToFile = str_replace(DIRECTORY_SEPARATOR, '/', $fileToUpdate);  
+    $remoteToFile = str_replace(DIRECTORY_SEPARATOR, '/', $fileToUpdate);
     $remoteToFile = substr($remoteToFile, strlen($PROJECT_DIR)+1);
     $remoteFolder = '/';
-    
+
     if ($dirPos = strrpos($remoteToFile, '/')) {
       $remoteFolder = '/' . substr($remoteToFile, 0, $dirPos + 1);
     }
@@ -122,4 +122,3 @@ function update() {
 }
 
 update();
-?>
